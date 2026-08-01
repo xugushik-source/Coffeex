@@ -2,7 +2,8 @@
 // CONFIG — поменять после деплоя (см. README)
 // ============================================================
 const WHATSAPP_NUMBER = '995568110777'; // Люси, хозяйка Coffeex
-const SHEETS_ENDPOINT = 'PASTE_APPS_SCRIPT_EXEC_URL_HERE';
+const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyX142Any4XtzxrJhP5NGKp-vDmFMsHiXfZgPA-L8DMkjeNfHJuxS7w6JuuztjuSsFT/exec
+';
 const PAYMENT_LINK_TEXT = 'Перевод на счёт Арутюна (временно, потом поменяем на счёт Coffeex):\nTBC: XXXX XXXX XXXX XXXX\nBOG: XXXX XXXX XXXX XXXX';
 const DISCOUNT_MIN_TOTAL = 15; // от скольки лари включается скидка
 const DISCOUNT_RATE = 0.10;    // 10%
