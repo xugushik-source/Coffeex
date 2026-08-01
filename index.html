@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Coffeex — Предзаказ</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="brand-bar">
+  <div class="brand-logo">C<span>offeex</span></div>
+  <div class="brand-sub">No1 in Akhalkalaki</div>
+</div>
+
+<div style="background:#FFC72C;color:#111;text-align:center;padding:9px 12px;font-size:12px;font-weight:800;">
+  🎉 Скидка 10% на заказ от 15₾ — уже посчитана автоматически
+</div>
+
+<!-- Клиентская страница: здесь ТОЛЬКО предзаказ.
+     Кода вкладок "Приём заказа", "Заказы", "Отчёты" в этом файле
+     нет вообще — их не спрятали, их здесь физически не существует. -->
+<div class="view active" id="view-predzakaz">
+  <div class="cat-pills" id="pills-predzakaz"></div>
+  <div class="wrap">
+    <div id="catalog-predzakaz"></div>
+
+    <div class="order-panel" id="orderpanel-predzakaz">
+      <div class="order-panel-title">🧾 Ваш предзаказ</div>
+      <div id="orderlines-predzakaz"></div>
+    </div>
+
+    <div class="order-panel">
+      <div class="order-panel-title">👤 Ваши данные</div>
+      <div class="form-group">
+        <label class="form-lbl">Имя *</label>
+        <input class="form-inp" id="pz-name" type="text" placeholder="Как к вам обращаться?">
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Телефон *</label>
+        <input class="form-inp" id="pz-phone" type="tel" placeholder="+995 5XX XXX XXX" onblur="checkLoyalty()">
+      </div>
+
+      <div id="loyalty-widget" style="display:none;margin-bottom:4px;">
+        <div id="loyalty-hint" style="font-size:11px;color:var(--mu);margin-bottom:6px;"></div>
+        <div id="loyalty-dots" style="display:flex;gap:6px;overflow-x:auto;"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-lbl">К какому времени подойти?</label>
+        <input class="form-inp" id="pz-time" type="text" placeholder="Например: через 20 минут">
+      </div>
+    </div>
+
+    <div class="order-panel">
+      <div class="order-panel-title">💳 Оплата</div>
+      <div class="pay-row">
+        <div class="pay-opt sel" id="pay-cash-predzakaz" onclick="selectPay('predzakaz','cash')">💵 Наличные</div>
+        <div class="pay-opt" id="pay-transfer-predzakaz" onclick="selectPay('predzakaz','transfer')">📲 Перевод</div>
+      </div>
+      <div class="pay-link-box" id="paylink-predzakaz" style="display:none">
+        <div id="pay-link-text" style="white-space:pre-line;margin-bottom:6px;">Перевод на счёт Арутюна (временно):<br>TBC: XXXX XXXX XXXX XXXX<br>BOG: XXXX XXXX XXXX XXXX</div>
+        <button class="btn-paid" id="btn-marked-paid" onclick="markPredzakazPaidClicked()">Я перевёл(а) — отметить</button>
+      </div>
+    </div>
+
+    <div id="pz-err" class="err-msg"></div>
+    <div id="pz-ok" class="ok-msg"></div>
+
+    <div class="total-box">
+      <div id="discount-row-predzakaz" style="display:none;color:#FFC72C;font-size:12px;font-weight:700;margin-bottom:8px;">🎉 Скидка -10%: −<span id="discount-amt-predzakaz">0</span>₾</div>
+      <div class="total-final">
+        <div class="total-final-lbl">Итого:</div>
+        <div class="total-final-sum"><span id="ordertotal-predzakaz">0</span> ₾</div>
+      </div>
+      <button class="btn-wa" onclick="submitPredzakaz()">🚀 Отправить предзаказ</button>
+    </div>
+  </div>
+
+  <div class="cart-bar" id="cartbar-predzakaz">
+    <div class="cart-info">
+      <div class="cart-lbl" id="cartbar-lbl-predzakaz">0 поз.</div>
+      <div class="cart-sum">Итого: <em id="cartbar-sum-predzakaz">0</em> ₾</div>
+    </div>
+    <button class="btn-cart-clear" onclick="clearCart('predzakaz')">✕</button>
+    <button class="btn-cart-action" onclick="scrollToOrderPanel('predzakaz')">Заказ →</button>
+  </div>
+</div>
+
+<footer>
+  <p><strong style="color:white">Coffeex</strong> — No1 in Akhalkalaki</p>
+</footer>
+
+<script src="catalog-data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
