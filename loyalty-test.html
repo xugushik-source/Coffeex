@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тест лояльности Coffeex</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, sans-serif; background: #f4f4f4; margin: 0; padding: 16px; color: #222; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { font-size: 12px; color: #888; margin-bottom: 20px; word-break: break-all; }
+  .card { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .card-title { font-weight: 800; font-size: 14px; margin-bottom: 10px; }
+  button { width: 100%; padding: 13px; border: none; border-radius: 10px; font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+  .btn-primary { background: #E31E24; color: #fff; }
+  .btn-secondary { background: #eee; color: #333; }
+  .btn-check { background: #2E9E4C; color: #fff; }
+  .btn-reset { background: #333; color: #fff; }
+  input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 14px; margin-bottom: 8px; }
+  .result { font-size: 13px; background: #f8f8f8; border-radius: 10px; padding: 10px; margin-top: 8px; white-space: pre-wrap; word-break: break-all; min-height: 20px; }
+  .ok { color: #2E9E4C; font-weight: 800; }
+  .bad { color: #E31E24; font-weight: 800; }
+  .log { font-size: 11px; color: #999; }
+</style>
+</head>
+<body>
+
+<h1>🧪 Тест лояльности — Coffeex</h1>
+<div class="sub">Тестовый скрипт (не боевой). Всё, что тут жмёшь, пишется только в тестовую таблицу.</div>
+
+<div class="card">
+  <div class="card-title">Шаг 1 — телефон с "+" и пробелами</div>
+  <button class="btn-primary" onclick="createOrder('+995 548 66 58 96', 'ФормаA')">Создать заказ (форма A)</button>
+  <div id="res1" class="result"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">Шаг 2 — тот же номер, но без "+" и пробелов</div>
+  <button class="btn-primary" onclick="createOrder('548665896', 'ФормаB')">Создать заказ (форма B)</button>
+  <div id="res2" class="result"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">Шаг 3 — проверить счётчик</div>
+  <button class="btn-check" onclick="checkLoyalty()">Проверить лояльность 548665896</button>
+  <div id="res3" class="result"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">Шаг 4 — догнать до 6 и проверить FREE</div>
+  <button class="btn-secondary" onclick="fillToSix()">Добить счётчик до 6 заказов подряд</button>
+  <div id="res4" class="result"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">Шаг 5 — списать бонус, проверить что счётчик НЕ сдвинулся</div>
+  <button class="btn-reset" onclick="redeemBonus()">Оформить бонусный (бесплатный) заказ</button>
+  <button class="btn-check" onclick="checkLoyalty()">Проверить счётчик ещё раз</button>
+  <div id="res5" class="result"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">Свой телефон / произвольный тест</div>
+  <input id="customPhone" type="tel" placeholder="+995 5XX XXX XXX">
+  <button class="btn-primary" onclick="createOrderCustom()">Создать заказ с этим телефоном</button>
+  <button class="btn-check" onclick="checkLoyaltyCustom()">Проверить его лояльность</button>
+  <div id="resCustom" class="result"></div>
+</div>
+
+<script>
+const ENDPOINT = 'https://script.google.com/macros/s/AKfycbya0h4bd7Lnxpw_GfSSBky6pDyuPD9wBSYvTwLxuiZey6kO_LyH5JiU-T_dWZNIqmMi/exec';
+const TEST_PHONE = '548665896';
+
+function genId() {
+  return 'TST' + Math.floor(Math.random() * 90000 + 10000);
+}
+
+function createOrder(phone, label) {
+  const el = document.getElementById(phone.includes('+') ? 'res1' : 'res2');
+  el.textContent = 'Отправляю...';
+  const order = {
+    action: 'create',
+    orderId: genId(),
+    source: 'barista',
+    name: 'ТЕСТ ' + label,
+    phone: phone,
+    fulfillment: 'pickup',
+    address: '',
+    pickupTime: 'сейчас',
+    items: 'Тестовый кофе — 5.00₾',
+    total: '5.00',
+    paymentMethod: 'cash',
+    status: 'paid',
+    comment: 'автотест ' + label
+  };
+  fetch(ENDPOINT, { method: 'POST', body: JSON.stringify(order) })
+    .then(r => r.json())
+    .then(data => { el.innerHTML = '<span class="ok">Отправлено</span>\nOrderID: ' + order.orderId + '\nОтвет: ' + JSON.stringify(data); })
+    .catch(err => { el.innerHTML = '<span class="bad">Ошибка</span>: ' + err; });
+}
+
+function checkLoyalty() {
+  const el = document.getElementById('res3');
+  el.textContent = 'Проверяю...';
+  fetch(ENDPOINT + '?action=loyalty&phone=' + encodeURIComponent(TEST_PHONE))
+    .then(r => r.json())
+    .then(data => { el.innerHTML = 'Телефон ' + TEST_PHONE + '\nСчётчик: <b>' + data.count + '</b>'; })
+    .catch(err => { el.innerHTML = '<span class="bad">Ошибка</span>: ' + err; });
+}
+
+async function fillToSix() {
+  const el = document.getElementById('res4');
+  el.textContent = 'Проверяю текущий счётчик...';
+  const cur = await fetch(ENDPOINT + '?action=loyalty&phone=' + encodeURIComponent(TEST_PHONE)).then(r => r.json());
+  let count = cur.count || 0;
+  el.textContent = 'Сейчас: ' + count + '. Добиваю до 6...';
+  const formats = ['+995 548 66 58 96', '548665896', '0548665896', '995548665896'];
+  let i = 0;
+  while (count < 6) {
+    const phone = formats[i % formats.length];
+    const order = {
+      action: 'create', orderId: genId(), source: 'barista', name: 'ТЕСТ добивка',
+      phone: phone, fulfillment: 'pickup', address: '', pickupTime: 'сейчас',
+      items: 'Тестовый кофе — 5.00₾', total: '5.00', paymentMethod: 'cash', status: 'paid', comment: 'автодобивка'
+    };
+    await fetch(ENDPOINT, { method: 'POST', body: JSON.stringify(order) });
+    count++;
+    i++;
+    el.textContent = 'Добавлено заказов: ' + count + ' из 6...';
+  }
+  const final = await fetch(ENDPOINT + '?action=loyalty&phone=' + encodeURIComponent(TEST_PHONE)).then(r => r.json());
+  const freeReady = final.count > 0 && final.count % 6 === 0;
+  el.innerHTML = 'Итог: <b>' + final.count + '</b>\n' + (freeReady ? '<span class="ok">✅ FREE должен показаться на клиенте</span>' : '<span class="bad">не кратно 6 — проверь вручную</span>');
+}
+
+function redeemBonus() {
+  const el = document.getElementById('res5');
+  el.textContent = 'Оформляю бонусный заказ...';
+  const order = {
+    action: 'create', orderId: genId(), source: 'barista', name: 'ТЕСТ бонус',
+    phone: TEST_PHONE, fulfillment: 'pickup', address: '', pickupTime: 'сейчас',
+    items: 'Бесплатный кофе (бонус)', total: '0', paymentMethod: 'cash', status: 'bonus',
+    comment: 'автотест списания бонуса'
+  };
+  fetch(ENDPOINT, { method: 'POST', body: JSON.stringify(order) })
+    .then(r => r.json())
+    .then(data => { el.innerHTML = '<span class="ok">Бонусный заказ создан</span>\nOrderID: ' + order.orderId + '\nТеперь жми "Проверить счётчик ещё раз" — если счётчик НЕ вырос, исключение работает.'; })
+    .catch(err => { el.innerHTML = '<span class="bad">Ошибка</span>: ' + err; });
+}
+
+function createOrderCustom() {
+  const phone = document.getElementById('customPhone').value.trim();
+  const el = document.getElementById('resCustom');
+  if (!phone) { el.innerHTML = '<span class="bad">Впиши телефон сверху</span>'; return; }
+  el.textContent = 'Отправляю...';
+  const order = {
+    action: 'create', orderId: genId(), source: 'barista', name: 'ТЕСТ произвольный',
+    phone: phone, fulfillment: 'pickup', address: '', pickupTime: 'сейчас',
+    items: 'Тестовый кофе — 5.00₾', total: '5.00', paymentMethod: 'cash', status: 'paid', comment: 'ручной тест'
+  };
+  fetch(ENDPOINT, { method: 'POST', body: JSON.stringify(order) })
+    .then(r => r.json())
+    .then(data => { el.innerHTML = '<span class="ok">Отправлено</span>\nOrderID: ' + order.orderId; })
+    .catch(err => { el.innerHTML = '<span class="bad">Ошибка</span>: ' + err; });
+}
+
+function checkLoyaltyCustom() {
+  const phone = document.getElementById('customPhone').value.trim();
+  const el = document.getElementById('resCustom');
+  if (!phone) { el.innerHTML = '<span class="bad">Впиши телефон сверху</span>'; return; }
+  fetch(ENDPOINT + '?action=loyalty&phone=' + encodeURIComponent(phone))
+    .then(r => r.json())
+    .then(data => { el.innerHTML = 'Счётчик для ' + phone + ': <b>' + data.count + '</b>'; })
+    .catch(err => { el.innerHTML = '<span class="bad">Ошибка</span>: ' + err; });
+}
+</script>
+</body>
+</html>
