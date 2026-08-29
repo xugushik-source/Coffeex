@@ -32,6 +32,19 @@
     </div>
 
     <div class="order-panel">
+      <div class="order-panel-title">🎁 Бонус (необязательно)</div>
+      <div class="form-group">
+        <label class="form-lbl">Телефон клиента</label>
+        <input class="form-inp" id="barista-phone" type="tel" placeholder="+995 5XX XXX XXX" onblur="checkLoyalty('barista')">
+      </div>
+      <div id="loyalty-widget-barista" style="display:none;margin-bottom:4px;">
+        <div id="loyalty-hint-barista" style="font-size:11px;color:var(--mu);margin-bottom:6px;"></div>
+        <div id="loyalty-dots-barista" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:8px;"></div>
+        <button id="bonus-toggle-barista" style="display:none;width:100%;padding:10px;border:none;border-radius:10px;background:#eee;color:#333;font-weight:800;font-size:12px;" onclick="toggleBonusMode()">🎁 Списать бесплатный кофе</button>
+      </div>
+    </div>
+
+    <div class="order-panel">
       <div class="order-panel-title">💳 Оплата</div>
       <div class="pay-row">
         <div class="pay-opt sel" id="pay-cash-barista" onclick="selectPay('barista','cash')">💵 Наличные</div>
@@ -136,6 +149,7 @@
       <button class="cat-pill" onclick="filterBoard('pending')">🟡 Ждут подтв.</button>
       <button class="cat-pill" onclick="filterBoard('paid')">🟢 Оплачено</button>
       <button class="cat-pill" onclick="filterBoard('cancelled')">Отменено</button>
+      <button class="cat-pill" onclick="filterBoard('bonus')">🎁 Бонус</button>
     </div>
     <button class="report-btn" style="margin-bottom:12px" onclick="loadOrderBoard()">🔄 Обновить</button>
     <div id="board-list"></div>

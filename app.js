@@ -365,18 +365,31 @@ function submitBaristaOrder() {
   const itemsText = Object.values(cart).map(l => l.name + (l.qty > 1 ? ' x' + l.qty : '') + ' — ' + (l.price * l.qty).toFixed(2) + '₾').join('\n');
   const discountLine = calc.qualifies ? ('\n🎉 Скидка -10% (заказ от 15₾): -' + calc.discount.toFixed(2) + '₾') : '';
 
+  const phoneInp = document.getElementById('barista-phone');
+  const phone = phoneInp ? phoneInp.value.trim() : '';
+  const isBonus = bonusMode.barista;
+  const orderTotal = isBonus ? 0 : calc.total;
+
   const order = {
     action: 'create',
-    orderId, source: 'barista', name: '(на месте)', phone: '', fulfillment: 'pickup',
-    address: '', pickupTime: 'сейчас', items: itemsText, total: calc.total.toFixed(2),
-    paymentMethod: payMethod.barista, status: payMethod.barista === 'cash' ? 'paid' : 'new',
-    comment: calc.qualifies ? ('скидка -10% применена, было ' + calc.subtotal.toFixed(2) + '₾') : ''
+    orderId, source: 'barista', name: '(на месте)', phone: phone, fulfillment: 'pickup',
+    address: '', pickupTime: 'сейчас', items: itemsText, total: orderTotal.toFixed(2),
+    paymentMethod: payMethod.barista,
+    status: isBonus ? 'bonus' : (payMethod.barista === 'cash' ? 'paid' : 'new'),
+    comment: isBonus ? '🎁 бесплатный кофе — списан по программе лояльности' : (calc.qualifies ? ('скидка -10% применена, было ' + calc.subtotal.toFixed(2) + '₾') : '')
   };
   logOrder(order);
 
-  const msg = '☕ *Заказ Coffeex* #' + orderId + '\n\n' + itemsText + discountLine + '\n\n💰 Итого: ' + calc.total.toFixed(2) + '₾\n💳 Оплата: ' + (payMethod.barista === 'cash' ? 'наличные' : 'перевод');
+  const msg = isBonus
+    ? '☕ *Coffeex* #' + orderId + '\n\n🎁 ' + itemsText + '\n\nБесплатно — бонус по программе лояльности'
+    : '☕ *Заказ Coffeex* #' + orderId + '\n\n' + itemsText + discountLine + '\n\n💰 Итого: ' + calc.total.toFixed(2) + '₾\n💳 Оплата: ' + (payMethod.barista === 'cash' ? 'наличные' : 'перевод');
   window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
+
   clearCart('barista');
+  bonusMode.barista = false;
+  if (phoneInp) phoneInp.value = '';
+  const widget = document.getElementById('loyalty-widget-barista');
+  if (widget) widget.style.display = 'none';
 }
 
 function submitPredzakaz() {
@@ -431,22 +444,35 @@ function markPredzakazPaidClicked() {
 // Google Таблица (не localStorage — иначе слетает при смене телефона).
 // Пока таблица не подключена, виджет просто не показывается.
 // ============================================================
-function checkLoyalty() {
-  const phoneInp = document.getElementById('pz-phone');
-  const widget = document.getElementById('loyalty-widget');
+const loyaltyState = { barista: null, predzakaz: null }; // {count, freeReady}
+let bonusMode = { barista: false };
+
+function loyaltyIds_(scope) {
+  if (scope === 'barista') {
+    return { phone: 'barista-phone', widget: 'loyalty-widget-barista', dots: 'loyalty-dots-barista', hint: 'loyalty-hint-barista' };
+  }
+  return { phone: 'pz-phone', widget: 'loyalty-widget', dots: 'loyalty-dots', hint: 'loyalty-hint' };
+}
+
+function checkLoyalty(scope) {
+  scope = scope || 'predzakaz'; // старый вызов checkLoyalty() без аргумента — как раньше, предзаказ
+  const ids = loyaltyIds_(scope);
+  const phoneInp = document.getElementById(ids.phone);
+  const widget = document.getElementById(ids.widget);
   if (!phoneInp || !widget) return;
   const phone = phoneInp.value.trim();
-  if (!phone || phone.length < 6) { widget.style.display = 'none'; return; }
+  if (!phone || phone.length < 6) { widget.style.display = 'none'; loyaltyState[scope] = null; updateBonusToggleVisibility_(scope); return; }
   if (!SHEETS_ENDPOINT || SHEETS_ENDPOINT.indexOf('PASTE_') === 0) { widget.style.display = 'none'; return; }
   fetch(SHEETS_ENDPOINT + '?action=loyalty&phone=' + encodeURIComponent(phone))
     .then(r => r.json())
-    .then(data => renderLoyalty(data.count || 0))
+    .then(data => renderLoyalty(scope, data.count || 0))
     .catch(() => { widget.style.display = 'none'; });
 }
 
-function renderLoyalty(count) {
-  const widget = document.getElementById('loyalty-widget');
-  const dotsEl = document.getElementById('loyalty-dots');
+function renderLoyalty(scope, count) {
+  const ids = loyaltyIds_(scope);
+  const widget = document.getElementById(ids.widget);
+  const dotsEl = document.getElementById(ids.dots);
   if (!widget || !dotsEl) return;
   const progress = count % LOYALTY_CYCLE;
   let html = '';
@@ -458,8 +484,45 @@ function renderLoyalty(count) {
   html += '<div style="min-width:42px;height:26px;border-radius:13px;flex-shrink:0;padding:0 6px;background:' + (freeReady ? '#2E9E4C' : '#eee') + ';color:' + (freeReady ? 'white' : '#999') + ';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;">FREE</div>';
   dotsEl.innerHTML = html;
   widget.style.display = 'block';
-  const hint = document.getElementById('loyalty-hint');
+  const hint = document.getElementById(ids.hint);
   if (hint) hint.textContent = freeReady ? '🎉 Следующий кофе — бесплатно!' : ('Ещё ' + (LOYALTY_CYCLE - 1 - progress) + ' покупок(а) до бесплатного кофе');
+  loyaltyState[scope] = { count, freeReady };
+  updateBonusToggleVisibility_(scope);
+}
+
+// ============================================================
+// СПИСАНИЕ БОНУСА (только вкладка "Приём заказа") — показывает
+// кнопку, только когда цикл лояльности этого телефона на "FREE".
+// ============================================================
+function updateBonusToggleVisibility_(scope) {
+  if (scope !== 'barista') return;
+  const btn = document.getElementById('bonus-toggle-barista');
+  if (!btn) return;
+  const ready = loyaltyState.barista && loyaltyState.barista.freeReady;
+  btn.style.display = ready ? 'block' : 'none';
+  if (!ready && bonusMode.barista) { bonusMode.barista = false; resetBonusButtonStyle_(btn); updateOrderPanel('barista'); }
+}
+
+function resetBonusButtonStyle_(btn) {
+  btn.style.background = '#eee';
+  btn.style.color = '#333';
+  btn.textContent = '🎁 Списать бесплатный кофе';
+}
+
+function toggleBonusMode() {
+  bonusMode.barista = !bonusMode.barista;
+  const btn = document.getElementById('bonus-toggle-barista');
+  const totalEl = document.getElementById('ordertotal-barista');
+  if (!btn) return;
+  if (bonusMode.barista) {
+    btn.style.background = '#2E9E4C';
+    btn.style.color = '#fff';
+    btn.textContent = '✅ Оформится бесплатно (бонус)';
+    if (totalEl) totalEl.textContent = '0';
+  } else {
+    resetBonusButtonStyle_(btn);
+    updateOrderPanel('barista');
+  }
 }
 
 // ============================================================
@@ -503,12 +566,13 @@ function renderBoard(orders) {
       '<div class="boc-items">' + (o.items || '').replace(/\n/g, '<br>') + '</div>' +
       '<div class="boc-sum">' + o.total + '₾</div>' +
       '<div class="boc-badges">' +
+      (o.status === 'bonus' ? '<div class="boc-badge" style="background:#2E9E4C;color:#fff;">🎁 Бонус</div>' : '') +
       '<div class="boc-badge">' + (o.source === 'predzakaz' ? 'Предзаказ' : 'На месте') + '</div>' +
       '<div class="boc-badge">' + (o.paymentMethod === 'cash' ? '💵 нал' : '📲 перевод') + '</div>' +
       '<div class="boc-badge">🏠 самовывоз</div>' +
       '</div>' +
       '<div class="boc-actions">' +
-      '<button class="boc-btn paid" onclick="updateOrderStatus(\'' + o.orderId + '\',\'paid\')">✅ Оплачено</button>' +
+      (o.status !== 'bonus' ? '<button class="boc-btn paid" onclick="updateOrderStatus(\'' + o.orderId + '\',\'paid\')">✅ Оплачено</button>' : '') +
       '<button class="boc-btn cancel" onclick="updateOrderStatus(\'' + o.orderId + '\',\'cancelled\')">✕ Отмена</button>' +
       '</div>' +
       '</div>';
