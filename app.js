@@ -93,51 +93,78 @@ function renderCatalog(containerId, scope) {
   });
 }
 
-function photoOrIcon(item, variant) {
-  let src = null;
+const SIZE_ORDER = ['S', 'M', 'L'];
+
+// 'flat' -> одна цена без вариантов; 'sized' -> только размеры S/M/L;
+// 'dual' -> HOT/ICE, и внутри каждого — свои размеры (Coffee Mix)
+function classifyItem(item) {
   if (item.price && typeof item.price === 'object') {
-    src = variant === 'hot' ? (item.photoHot || item.photo) : (item.photoCold || item.photo);
-  } else {
-    src = item.photo;
+    if ('hot' in item.price || 'cold' in item.price) return 'dual';
+    return 'sized';
   }
-  if (src) return '<img src="' + src + '" alt="' + item.name + '" loading="lazy">';
-  return (item.icon || '🥤');
+  return 'flat';
+}
+function availableSizes(priceObj) {
+  return SIZE_ORDER.filter(s => priceObj[s] !== undefined);
+}
+function defaultSizesFor(item, kind) {
+  if (kind === 'dual') return availableSizes(item.price.cold);
+  if (kind === 'sized') return availableSizes(item.price);
+  return [];
+}
+function unitPrice(item, variant, size) {
+  const kind = classifyItem(item);
+  if (kind === 'flat') return item.price;
+  if (kind === 'sized') return item.price[size];
+  return item.price[variant][size];
+}
+function priceLabelText(n) {
+  return n.toFixed(2).replace(/\.00$/, '') + ' ₾';
 }
 
-function priceLabel(item, variant) {
-  if (item.price && typeof item.price === 'object') {
-    const v = variant === 'hot' ? item.price.hot : item.price.cold;
-    return v.toFixed(2).replace(/\.00$/, '') + ' ₾';
-  }
-  return item.price.toFixed(2).replace(/\.00$/, '') + ' ₾';
+function photoOrIcon(item) {
+  if (item.photo) return '<img src="' + item.photo + '" alt="' + item.name + '" loading="lazy">';
+  return (item.icon || '🥤');
 }
 
 function buildTile(item, scope) {
   const tile = document.createElement('div');
   tile.className = 'prod-tile';
-  const isDual = item.price && typeof item.price === 'object';
+  const kind = classifyItem(item);
+  const isDual = kind === 'dual';
+  const sizesList = defaultSizesFor(item, kind);
   const defaultVariant = isDual ? 'cold' : null;
+  const defaultSize = sizesList.length ? sizesList[0] : null;
   tile.id = 'tile-' + scope + '-' + item.id;
   tile.dataset.tileKey = scope + ':' + item.id;
   tile.dataset.variant = defaultVariant || '';
+  tile.dataset.size = defaultSize || '';
+
+  const variantRow = isDual ?
+    '<div class="hotcold-tag" id="hc-' + scope + '-' + item.id + '">' +
+    '<div class="hc-btn sel" data-v="cold" onclick="setVariant(event,\'' + scope + '\',\'' + item.id + '\',\'cold\')">❄️ Ice</div>' +
+    '<div class="hc-btn" data-v="hot" onclick="setVariant(event,\'' + scope + '\',\'' + item.id + '\',\'hot\')">🔥 Hot</div>' +
+    '</div>' : '';
+
+  const sizeRow = sizesList.length > 1 ?
+    '<div class="hotcold-tag" id="sz-' + scope + '-' + item.id + '">' +
+    sizesList.map(s => '<div class="hc-btn' + (s === defaultSize ? ' sel' : '') + '" data-sz="' + s + '" onclick="setSize(event,\'' + scope + '\',\'' + item.id + '\',\'' + s + '\')">' + s + '</div>').join('') +
+    '</div>' : '';
 
   tile.innerHTML =
-    '<div class="prod-photo" id="photo-' + scope + '-' + item.id + '">' + photoOrIcon(item, defaultVariant) + '</div>' +
+    '<div class="prod-photo" id="photo-' + scope + '-' + item.id + '">' + photoOrIcon(item) + '</div>' +
     (item.badge ? '<div class="prod-badge">' + item.badge + '</div>' : '') +
     '<div class="prod-body">' +
     '<div class="prod-name">' + item.name + '</div>' +
-    (isDual ? '<div class="hotcold-tag" id="hc-' + scope + '-' + item.id + '">' +
-      '<div class="hc-btn sel" data-v="cold" onclick="setVariant(event,\'' + scope + '\',\'' + item.id + '\',\'cold\')">❄️ ' + item.price.cold + '₾</div>' +
-      '<div class="hc-btn" data-v="hot" onclick="setVariant(event,\'' + scope + '\',\'' + item.id + '\',\'hot\')">🔥 ' + item.price.hot + '₾</div>' +
-      '</div>' : '') +
+    variantRow + sizeRow +
     '<div class="prod-bottom">' +
-    '<div class="prod-price" id="price-' + scope + '-' + item.id + '">' + (isDual ? '' : priceLabel(item, null)) + '</div>' +
+    '<div class="prod-price" id="price-' + scope + '-' + item.id + '">' + priceLabelText(unitPrice(item, defaultVariant, defaultSize)) + '</div>' +
     '<div class="prod-qty-badge" data-badge-key="' + scope + ':' + item.id + '" style="display:none">1</div>' +
     '</div></div>';
 
   tile.onclick = function (e) {
     if (e.target.closest('.hc-btn')) return;
-    addToCart(scope, item, tile.dataset.variant || null);
+    addToCart(scope, item, tile.dataset.variant || null, tile.dataset.size || null);
   };
   return tile;
 }
@@ -150,7 +177,7 @@ function buildAddonTile(addon, scope) {
   div.innerHTML = '<div class="prod-body" style="display:flex;align-items:center;justify-content:space-between;padding:12px;">' +
     '<div>' + addon.icon + ' <b>' + addon.name + '</b> <span style="color:var(--mu);font-size:11px">+' + addon.price + '₾</span></div>' +
     '<div class="prod-qty-badge" data-badge-key="' + scope + ':' + addon.id + '" style="display:none">1</div></div>';
-  div.onclick = function () { addToCart(scope, addon, null); };
+  div.onclick = function () { addToCart(scope, addon, null, null); };
   return div;
 }
 
@@ -176,7 +203,10 @@ function buildFeaturedSection(title, kind, itemsSpec, scope) {
 function buildFeaturedCard(spec, scope, kind) {
   const item = ITEM_INDEX[spec.id];
   if (!item) return null;
-  const variant = spec.variant || (item.price && typeof item.price === 'object' ? 'cold' : null);
+  const itemKind = classifyItem(item);
+  const variant = spec.variant || (itemKind === 'dual' ? 'cold' : null);
+  const sizesList = defaultSizesFor(item, itemKind);
+  const size = spec.size || (sizesList.length ? sizesList[0] : null);
   const displayName = spec.displayName || item.name;
 
   const card = document.createElement('div');
@@ -184,15 +214,23 @@ function buildFeaturedCard(spec, scope, kind) {
   card.dataset.tileKey = scope + ':' + item.id;
 
   card.innerHTML =
-    '<div class="feat-photo">' + photoOrIcon(item, variant) +
+    '<div class="feat-photo">' + photoOrIcon(item) +
     '<div class="featured-ribbon ' + kind + '">' + (kind === 'top' ? '🔥 ТОП' : '🆕 NEW') + '</div>' +
     '<div class="prod-qty-badge feat-qty-badge" data-badge-key="' + scope + ':' + item.id + '" style="display:none">1</div>' +
     '</div>' +
     '<div class="feat-name">' + displayName + '</div>' +
-    '<div class="feat-price">' + priceLabel(item, variant) + '</div>';
+    '<div class="feat-price">' + priceLabelText(unitPrice(item, variant, size)) + '</div>';
 
-  card.onclick = function () { addToCart(scope, item, variant); };
+  card.onclick = function () { addToCart(scope, item, variant, size); };
   return card;
+}
+
+function updateTilePriceDisplay(scope, itemId) {
+  const item = ITEM_INDEX[itemId];
+  const tile = document.getElementById('tile-' + scope + '-' + itemId);
+  if (!item || !tile) return;
+  const priceEl = document.getElementById('price-' + scope + '-' + itemId);
+  if (priceEl) priceEl.textContent = priceLabelText(unitPrice(item, tile.dataset.variant || null, tile.dataset.size || null));
 }
 
 function setVariant(e, scope, itemId, variant) {
@@ -201,23 +239,35 @@ function setVariant(e, scope, itemId, variant) {
   tile.dataset.variant = variant;
   const hc = document.getElementById('hc-' + scope + '-' + itemId);
   hc.querySelectorAll('.hc-btn').forEach(b => b.classList.toggle('sel', b.dataset.v === variant));
+  updateTilePriceDisplay(scope, itemId);
+}
+
+function setSize(e, scope, itemId, size) {
+  e.stopPropagation();
+  const tile = document.getElementById('tile-' + scope + '-' + itemId);
+  tile.dataset.size = size;
+  const sz = document.getElementById('sz-' + scope + '-' + itemId);
+  sz.querySelectorAll('.hc-btn').forEach(b => b.classList.toggle('sel', b.dataset.sz === size));
+  updateTilePriceDisplay(scope, itemId);
 }
 
 // ============================================================
 // CART
 // ============================================================
-function cartKey(item, variant) {
-  return item.id + (variant ? ':' + variant : '');
+function cartKey(item, variant, size) {
+  return item.id + (variant ? ':' + variant : '') + (size ? ':' + size : '');
 }
 
-function addToCart(scope, item, variant) {
-  const key = cartKey(item, variant);
+function addToCart(scope, item, variant, size) {
+  const key = cartKey(item, variant, size);
   const cart = carts[scope];
-  const unitPrice = (item.price && typeof item.price === 'object') ? item.price[variant] : item.price;
+  const price = unitPrice(item, variant, size);
+  const variantLabel = variant ? (variant === 'hot' ? ' (горячий)' : ' (холодный)') : '';
+  const sizeLabel = size ? ' — ' + size : '';
   if (cart[key]) {
     cart[key].qty += 1;
   } else {
-    cart[key] = { id: item.id, name: item.name + (variant ? (variant === 'hot' ? ' (горячий)' : ' (холодный)') : ''), price: unitPrice, qty: 1, isAddon: !!item.isAddon };
+    cart[key] = { id: item.id, name: item.name + variantLabel + sizeLabel, price: price, qty: 1, isAddon: !!item.isAddon };
   }
   syncItemUI(scope, item.id);
   updateCartBar(scope);
